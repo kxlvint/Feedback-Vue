@@ -10,11 +10,15 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
     "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/vite": "^4.3.3",
     "dayjs": "^1.11.23",
     "pinia": "^4.1.0",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "tailwindcss": "^4.3.3",
+    "unique-names-generator": "^4.7.1",
     "vue": "^3.5.44",
     "vue-hooks-plus": "^2.4.3"
   },
