@@ -2,9 +2,16 @@
 import { computed, reactive } from 'vue'
 import { useRequest } from 'vue-hooks-plus'
 import { fetchFeedback } from '../../lib/feedback'
-import { CATEGORIES, CATEGORY_STYLES, type Category } from '../../lib/constants'
-import { formatExact, fromNow } from '../../lib/date'
+import { CATEGORIES, type Category } from '../../lib/constants'
+import FeedbackCard from '../../components/FeedbackCard.vue'
+import SubmitForm from '../../components/SubmitForm.vue'
 
+// Every request parameter in one reactive object. Passing it as a single refreshDeps
+// source means watch() tracks it deeply, so mutating any field re-runs the request —
+// and adding a new parameter later needs no change to refreshDeps.
+//
+// Mutating several fields in the same tick batches into one trigger, so there is no
+// double-fetch when a filter change also resets the page.
 const params = reactive({
   pageIndex: 1,
   pageSize: 10,
@@ -38,6 +45,10 @@ function setCategory(value: Category | null) {
       </p>
     </header>
 
+    <!-- A new row goes to the top of the wall, so refetch rather than splicing it
+         into the local list: the server ordering stays the single source of truth. -->
+    <SubmitForm @submitted="refresh()" />
+
     <div class="mb-6 flex items-center gap-3">
       <label for="category" class="text-sm font-medium text-slate-700">Filter</label>
       <select
@@ -50,7 +61,11 @@ function setCategory(value: Category | null) {
         <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
       </select>
 
-      <span v-if="loading" class="text-sm text-slate-400">Loading…</span>
+      <span
+        v-if="loading"
+        class="size-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-500"
+        aria-label="Loading feedback"
+      />
       <span v-else-if="total" class="ml-auto text-sm text-slate-400">
         {{ total }} total
       </span>
@@ -80,36 +95,8 @@ function setCategory(value: Category | null) {
       No feedback yet{{ params.category ? ` in ${params.category}` : '' }}.
     </p>
 
-    <!-- Plain list for now — this is what the virtual scroller replaces. -->
     <ul v-else class="space-y-3">
-      <li
-        v-for="item in feedback"
-        :key="item.id"
-        class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <span
-            class="rounded-full px-2.5 py-0.5 text-xs font-medium"
-            :class="CATEGORY_STYLES[item.category as Category]"
-          >
-            {{ item.category }}
-          </span>
-          <time
-            :datetime="item.created_at"
-            :title="formatExact(item.created_at)"
-            class="shrink-0 text-xs text-slate-400"
-          >
-            {{ fromNow(item.created_at) }}
-          </time>
-        </div>
-
-        <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-          {{ item.content }}
-        </p>
-
-        <!-- Upvote button goes here. See stores/votes.ts and upvoteFeedback(). -->
-        <p class="mt-3 text-xs text-slate-500">{{ item.upvotes }} upvotes</p>
-      </li>
+      <FeedbackCard v-for="item in feedback" :key="item.id" :item="item" />
     </ul>
   </main>
 </template>
