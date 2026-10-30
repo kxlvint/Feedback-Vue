@@ -21,6 +21,7 @@ export type Database = {
           content: string
           category: string
           upvotes: number
+          display_name: string | null
         }
         Insert: {
           id?: string
@@ -28,6 +29,7 @@ export type Database = {
           content: string
           category: string
           upvotes?: number
+          display_name?: string | null
         }
         Update: {
           id?: string
@@ -35,6 +37,7 @@ export type Database = {
           content?: string
           category?: string
           upvotes?: number
+          display_name?: string | null
         }
         Relationships: []
       }
@@ -42,6 +45,10 @@ export type Database = {
     Views: Record<never, never>
     Functions: {
       upvote_feedback: {
+        Args: { feedback_id: string }
+        Returns: number
+      }
+      remove_upvote_feedback: {
         Args: { feedback_id: string }
         Returns: number
       }

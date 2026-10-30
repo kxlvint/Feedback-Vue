@@ -6,7 +6,16 @@ create table if not exists feedback (
   created_at timestamptz not null default now(),
   content    text        not null check (char_length(trim(content)) between 1 and 500),
   category   text        not null check (category in ('Culture', 'Workflow', 'Technical', 'Other')),
-  upvotes    integer     not null default 0 check (upvotes >= 0)
+  upvotes    integer     not null default 0 check (upvotes >= 0),
+
+  -- A per-POST display identity, generated fresh at submit time. Not per person:
+  -- two posts by the same visitor share nothing, so this stays decorative and
+  -- carries no information about authorship. Nullable because rows created before
+  -- these columns existed have no identity, and inventing one would be fake data.
+  -- No avatar column: the avatar is generated in the browser with display_name as
+  -- the DiceBear seed, so it is deterministic from this one value. Nothing to store,
+  -- and the art style can change later without migrating data.
+  display_name text check (display_name is null or char_length(display_name) between 1 and 60)
 );
 
 -- The wall is sorted by recency and filtered by category; this covers both.
@@ -58,3 +67,38 @@ $$;
 
 revoke all on function upvote_feedback(uuid) from public;
 grant execute on function upvote_feedback(uuid) to anon;
+
+-- Removing an upvote is the mirror of adding one, and needs the same treatment:
+-- a narrow SECURITY DEFINER function rather than an UPDATE policy.
+--
+-- Note `greatest(upvotes - 1, 0)`: the table has `check (upvotes >= 0)`, so a bare
+-- `upvotes - 1` on a zero row would raise a constraint violation. Clamping keeps the
+-- call idempotent at the floor instead of erroring.
+--
+-- Deliberately NOT a single function taking a delta parameter: that would let a
+-- caller pass any number and set the count to whatever they liked, which is the
+-- exact hole the function exists to close. Two fixed-direction functions instead.
+create or replace function remove_upvote_feedback(feedback_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_count integer;
+begin
+  update feedback
+     set upvotes = greatest(upvotes - 1, 0)
+   where id = feedback_id
+  returning upvotes into new_count;
+
+  if new_count is null then
+    raise exception 'feedback % not found', feedback_id;
+  end if;
+
+  return new_count;
+end;
+$$;
+
+revoke all on function remove_upvote_feedback(uuid) from public;
+grant execute on function remove_upvote_feedback(uuid) to anon;
