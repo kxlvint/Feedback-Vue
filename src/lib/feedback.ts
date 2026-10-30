@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { Category } from './constants'
 import type { Database } from '../types/database'
+import { generateDisplayName } from './identity'
 
 export type Feedback = Database['public']['Tables']['feedback']['Row']
 
@@ -17,7 +18,7 @@ export type FetchFeedbackParams = {
   pageSize?: number
 }
 
-const COLUMNS = 'id, created_at, content, category, upvotes' as const
+const COLUMNS = 'id, created_at, content, category, upvotes, display_name' as const
 
 // supabase-js resolves with { data, error } instead of throwing, so every call here
 // normalises to "throw on failure" and lets the components handle it in one place.
@@ -64,14 +65,25 @@ export async function submitFeedback(
 ): Promise<Feedback> {
   const result = await supabase
     .from('feedback')
-    .insert({ content: content.trim(), category })
+    // The name is generated here rather than passed in, so no caller can choose
+    // one. It is per-post decoration, not an identity the user controls.
+    .insert({ content: content.trim(), category, display_name: generateDisplayName() })
     .select(COLUMNS)
     .single()
 
   return unwrap(result)
 }
 
-// Calls the SECURITY DEFINER function from schema.sql and returns the new count.
+// Both call SECURITY DEFINER functions from schema.sql and return the new count.
 export async function upvoteFeedback(id: string): Promise<number> {
   return unwrap(await supabase.rpc('upvote_feedback', { feedback_id: id }))
+}
+
+export async function removeUpvoteFeedback(id: string): Promise<number> {
+  return unwrap(await supabase.rpc('remove_upvote_feedback', { feedback_id: id }))
+}
+
+/** Picks the right direction, so components do not branch on it themselves. */
+export function setUpvote(id: string, voted: boolean): Promise<number> {
+  return voted ? upvoteFeedback(id) : removeUpvoteFeedback(id)
 }
