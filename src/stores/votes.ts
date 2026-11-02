@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore } from 'pinia';
 
 // Remembers which feedback this visitor has upvoted — and nothing else.
 //
@@ -24,7 +24,7 @@ export const useVotesStore = defineStore('votes', {
     // A getter that takes an argument has to return a function: getters are cached
     // computeds keyed on nothing, so they cannot depend on a parameter themselves.
     hasVoted: (state) => {
-      return (id: string): boolean => state.votedIds.includes(id)
+      return (id: string): boolean => state.votedIds.includes(id);
     },
   },
 
@@ -41,13 +41,13 @@ export const useVotesStore = defineStore('votes', {
      * succeeds, so a failed vote does not leave the UI claiming otherwise.
      */
     setVoted(id: string, voted: boolean) {
-      const index = this.votedIds.indexOf(id)
+      const index = this.votedIds.indexOf(id);
 
       if (voted && index === -1) {
-        this.votedIds.push(id)
+        this.votedIds.push(id);
       } else if (!voted && index !== -1) {
-        this.votedIds.splice(index, 1)
+        this.votedIds.splice(index, 1);
       }
     },
   },
-})
+});

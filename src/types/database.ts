@@ -9,51 +9,51 @@
 // Worth doing before you submit — a generated file proves the types match the real
 // database rather than your memory of it.
 
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
     Tables: {
       feedback: {
         Row: {
-          id: string
-          created_at: string
-          content: string
-          category: string
-          upvotes: number
-          display_name: string | null
-        }
+          id: string;
+          created_at: string;
+          content: string;
+          category: string;
+          upvotes: number;
+          display_name: string | null;
+        };
         Insert: {
-          id?: string
-          created_at?: string
-          content: string
-          category: string
-          upvotes?: number
-          display_name?: string | null
-        }
+          id?: string;
+          created_at?: string;
+          content: string;
+          category: string;
+          upvotes?: number;
+          display_name?: string | null;
+        };
         Update: {
-          id?: string
-          created_at?: string
-          content?: string
-          category?: string
-          upvotes?: number
-          display_name?: string | null
-        }
-        Relationships: []
-      }
-    }
-    Views: Record<never, never>
+          id?: string;
+          created_at?: string;
+          content?: string;
+          category?: string;
+          upvotes?: number;
+          display_name?: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: Record<never, never>;
     Functions: {
       upvote_feedback: {
-        Args: { feedback_id: string }
-        Returns: number
-      }
+        Args: { feedback_id: string };
+        Returns: number;
+      };
       remove_upvote_feedback: {
-        Args: { feedback_id: string }
-        Returns: number
-      }
-    }
-    Enums: Record<never, never>
-    CompositeTypes: Record<never, never>
-  }
-}
+        Args: { feedback_id: string };
+        Returns: number;
+      };
+    };
+    Enums: Record<never, never>;
+    CompositeTypes: Record<never, never>;
+  };
+};
