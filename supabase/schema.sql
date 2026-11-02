@@ -102,3 +102,5 @@ $$;
 
 revoke all on function remove_upvote_feedback(uuid) from public;
 grant execute on function remove_upvote_feedback(uuid) to anon;
+
+alter publication supabase_realtime add table feedback;
