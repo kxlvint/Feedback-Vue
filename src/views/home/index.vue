@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, reactive, ref } from 'vue';
-import { useRequest } from 'vue-hooks-plus';
+import { useInViewport, useRequest } from 'vue-hooks-plus';
 import { fetchFeedback, type Feedback } from '../../lib/feedback';
 import { CATEGORIES, type Category, CATEGORY_STYLES } from '../../lib/constants';
 import DScroller from '../../components/DScroller.vue';
 import SubmitForm from '../../components/SubmitForm.vue';
 import FeedbackCard from './components/FeedbackCard.vue';
+import IconArrowUp from '~icons/heroicons/arrow-up-20-solid';
 import { supabase } from '../../lib/supabase';
 
 const searchParams = reactive({
@@ -17,6 +18,9 @@ const searchParams = reactive({
 const dataList = ref<Feedback[]>([]);
 const pendingRows = ref<Feedback[]>([]);
 const listRef = ref<HTMLElement | null>(null);
+const headerRef = ref<HTMLElement | null>(null);
+
+const [headerInViewport] = useInViewport(headerRef);
 const total = ref(0);
 const isEnd = ref(false);
 
@@ -100,15 +104,20 @@ async function showPending() {
   pendingRows.value = [];
 
   await nextTick();
-  listRef.value?.scrollIntoView({
-    block: 'start',
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-  });
+  listRef.value?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
+}
+
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
 }
 </script>
 <template>
   <main class="mx-auto max-w-2xl px-4 py-10">
-    <header class="mb-8">
+    <header ref="headerRef" class="mb-8">
       <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team Feedback Loop</h1>
       <p class="mt-1 text-sm text-slate-500">
         Anonymous feedback from the team. No names are collected.
@@ -189,13 +198,7 @@ async function showPending() {
         class="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white shadow-lg ring-1 ring-slate-900/5 transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         @click="showPending()"
       >
-        <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path
-            fill-rule="evenodd"
-            d="M10 17a.75.75 0 0 1-.75-.75V5.61L5.3 9.7a.75.75 0 0 1-1.1-1.02l5.25-5.5a.75.75 0 0 1 1.1 0l5.25 5.5a.75.75 0 1 1-1.1 1.02L10.75 5.61V16.25A.75.75 0 0 1 10 17Z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <IconArrowUp class="size-3.5" aria-hidden="true" />
         Show {{ pendingRows.length }} new
       </button>
     </div>
@@ -223,5 +226,15 @@ async function showPending() {
         searchParams.categories.length ? ` in ${searchParams.categories.join(', ')}` : ''
       }}.
     </p>
+
+    <button
+      v-if="headerInViewport === false"
+      type="button"
+      aria-label="Back to top"
+      class="fixed bottom-6 right-6 z-30 inline-flex size-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-lg transition hover:border-slate-400 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+      @click="scrollToTop()"
+    >
+      <IconArrowUp class="size-4" aria-hidden="true" />
+    </button>
   </main>
 </template>
