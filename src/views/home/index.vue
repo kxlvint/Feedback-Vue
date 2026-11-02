@@ -1,45 +1,66 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
-import { useRequest } from 'vue-hooks-plus'
-import { fetchFeedback } from '../../lib/feedback'
-import { CATEGORIES, type Category } from '../../lib/constants'
-import FeedbackCard from '../../components/FeedbackCard.vue'
-import SubmitForm from '../../components/SubmitForm.vue'
+import { reactive, ref } from 'vue';
+import { useRequest } from 'vue-hooks-plus';
+import { fetchFeedback, type Feedback } from '../../lib/feedback';
+import { CATEGORIES, type Category, CATEGORY_STYLES } from '../../lib/constants';
+import DScroller from '../../components/DScroller.vue';
+import SubmitForm from '../../components/SubmitForm.vue';
+import FeedbackCard from './components/FeedbackCard.vue';
 
-// Every request parameter in one reactive object. Passing it as a single refreshDeps
-// source means watch() tracks it deeply, so mutating any field re-runs the request —
-// and adding a new parameter later needs no change to refreshDeps.
-//
-// Mutating several fields in the same tick batches into one trigger, so there is no
-// double-fetch when a filter change also resets the page.
-const params = reactive({
+const searchParams = reactive({
   pageIndex: 1,
   pageSize: 10,
-  category: null as Category | null,
-})
+  categories: [] as Category[],
+});
 
-const { data, loading, error, refresh } = useRequest(() => fetchFeedback(params), {
-  refreshDeps: [params],
-})
+const dataList = ref<Feedback[]>([]);
+const total = ref(0);
+const isEnd = ref(false);
 
-// `data` is undefined until the first response lands.
-const feedback = computed(() => data.value?.rows ?? [])
-const total = computed(() => data.value?.total ?? 0)
+const { loading: loading_fetchFeedback, error: error_fetchFeedback } = useRequest(
+  () => fetchFeedback(searchParams),
+  {
+    refreshDeps: [searchParams],
+    onSuccess: (data) => {
+      dataList.value = dataList.value.concat(data.rows);
+      isEnd.value = dataList.value.length >= data.total;
+      total.value = data.total;
+    },
+  },
+);
 
-// Changing the filter invalidates the current page number, so reset it in the same
-// tick as the filter change.
-function setCategory(value: Category | null) {
-  params.category = value
-  params.pageIndex = 1
+function loadMore() {
+  if (!dataList.value.length) return;
+  if (loading_fetchFeedback.value || isEnd.value) return;
+  searchParams.pageIndex++;
+}
+
+function resetSearch() {
+  dataList.value = [];
+  total.value = 0;
+  isEnd.value = false;
+  searchParams.pageIndex = 1;
+}
+
+function toggleCategory(value: Category) {
+  const i = searchParams.categories.indexOf(value);
+  if (i === -1) {
+    searchParams.categories.push(value);
+  } else {
+    searchParams.categories.splice(i, 1);
+  }
+  resetSearch();
+}
+
+function clearCategories() {
+  searchParams.categories = [];
+  resetSearch();
 }
 </script>
-
 <template>
   <main class="mx-auto max-w-2xl px-4 py-10">
     <header class="mb-8">
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">
-        Team Feedback Loop
-      </h1>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team Feedback Loop</h1>
       <p class="mt-1 text-sm text-slate-500">
         Anonymous feedback from the team. No names are collected.
       </p>
@@ -47,56 +68,94 @@ function setCategory(value: Category | null) {
 
     <!-- A new row goes to the top of the wall, so refetch rather than splicing it
          into the local list: the server ordering stays the single source of truth. -->
-    <SubmitForm @submitted="refresh()" />
+    <SubmitForm @submitted="resetSearch()" />
 
     <div class="mb-6 flex items-center gap-3">
-      <label for="category" class="text-sm font-medium text-slate-700">Filter</label>
-      <select
-        id="category"
-        :value="params.category"
-        class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-        @change="setCategory(($event.target as HTMLSelectElement).value as Category || null)"
-      >
-        <option value="">All categories</option>
-        <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
-      </select>
-
+      <span class="text-sm font-medium text-slate-700">Filter</span>
+      <div role="group" aria-label="Filter by category" class="flex flex-wrap gap-2">
+        <!-- "All" is a reset, not a fifth category: picking all four by hand returns
+             the same rows from a different state, so it clears instead. -->
+        <button
+          type="button"
+          class="rounded-full border px-3 py-1 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          :class="
+            searchParams.categories.length === 0
+              ? 'border-slate-900 bg-slate-900 text-white'
+              : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+          "
+          :aria-pressed="searchParams.categories.length === 0"
+          @click="clearCategories()"
+        >
+          All
+        </button>
+        <!-- aria-pressed carries the selected state: these are toggles, and the
+             colour alone says nothing to a screen reader. Selected pills reuse the
+             same tints FeedbackCard puts on its badge. -->
+        <button
+          v-for="c in CATEGORIES"
+          :key="c"
+          type="button"
+          class="rounded-full border px-3 py-1 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          :class="
+            searchParams.categories.includes(c)
+              ? ['border-transparent', CATEGORY_STYLES[c]]
+              : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+          "
+          :aria-pressed="searchParams.categories.includes(c)"
+          @click="toggleCategory(c)"
+        >
+          {{ c }}
+        </button>
+      </div>
       <span
-        v-if="loading"
+        v-if="loading_fetchFeedback"
         class="size-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-500"
         aria-label="Loading feedback"
       />
+      <!-- "x of N" rather than a bare total: the list grows as you scroll, so the
+           total alone would not say how much is on screen. -->
       <span v-else-if="total" class="ml-auto text-sm text-slate-400">
-        {{ total }} total
+        {{ dataList.length }} of {{ total }}
       </span>
     </div>
 
     <div
-      v-if="error"
+      v-if="error_fetchFeedback"
       class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
     >
-      <p class="font-medium">Couldn't load feedback.</p>
-      <p class="mt-1 text-red-700">{{ error.message }}</p>
+      <p class="font-medium">Oops.. Something went wrong.</p>
+      <p class="mt-1 text-red-700">{{ error_fetchFeedback.message }}</p>
       <button
         type="button"
         class="mt-2 font-medium text-red-900 underline hover:no-underline"
-        @click="refresh()"
+        @click="resetSearch()"
       >
         Try again
       </button>
     </div>
+    <div v-show="dataList.length > 0">
+      <DScroller
+        :items="dataList"
+        :loading="loading_fetchFeedback"
+        :is-end="isEnd"
+        end-text="That's everything."
+        @load-more="loadMore"
+      >
+        <template #default="{ item }">
+          <div class="pb-3">
+            <FeedbackCard :item="item" />
+          </div>
+        </template>
+      </DScroller>
+    </div>
 
-    <!-- Only show the empty state once a request has completed, or it flashes on
-         first paint. -->
     <p
-      v-else-if="!loading && total === 0"
+      v-if="!loading_fetchFeedback && !dataList.length && !error_fetchFeedback"
       class="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500"
     >
-      No feedback yet{{ params.category ? ` in ${params.category}` : '' }}.
+      No feedback yet{{
+        searchParams.categories.length ? ` in ${searchParams.categories.join(', ')}` : ''
+      }}.
     </p>
-
-    <ul v-else class="space-y-3">
-      <FeedbackCard v-for="item in feedback" :key="item.id" :item="item" />
-    </ul>
   </main>
 </template>
