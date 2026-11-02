@@ -63,20 +63,51 @@ const domRef = ref<HTMLElement | null>(null);
 const showDS = ref(true);
 const [inViewport] = useInViewport(domRef);
 
-watch([inViewport, () => props.items], ([inViewportNewVal, itemsNewVal]) => {
-  if (inViewportNewVal && !props.isEnd) {
-    emit('loadMore');
-  }
-  // Emptying the list (a filter change, say) leaves the scroller holding measured
-  // heights for rows that no longer exist. Remounting it throws that cache away so
-  // the next set of rows is measured from scratch.
-  if (!itemsNewVal?.length) {
-    showDS.value = false;
-    nextTick(() => {
-      showDS.value = true;
-    });
-  }
+function requestMore() {
+  if (!props.isEnd) emit('loadMore');
+}
+
+/**
+ * Fresh measurement of the sentinel, for the moments when `inViewport` is known to be
+ * out of date. Assumes page-mode, i.e. the window is the scroll container.
+ */
+function sentinelInViewport() {
+  const el = domRef.value;
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.top < window.innerHeight && rect.bottom > 0;
+}
+
+// The observer reports a transition into view — the ordinary "scrolled to the bottom".
+watch(inViewport, (visible) => {
+  if (visible) requestMore();
 });
+
+watch(
+  () => props.items,
+  async (items) => {
+    // Emptying the list (a filter change, say) leaves the scroller holding measured
+    // heights for rows that no longer exist. Remounting it throws that cache away so
+    // the next set of rows is measured from scratch.
+    if (!items?.length) {
+      showDS.value = false;
+      await nextTick();
+      showDS.value = true;
+      return;
+    }
+
+    // A page that does not fill the viewport leaves the sentinel visible, and the
+    // observer will not fire again — the intersection ratio never crosses 0 — so the
+    // chain would stall. Hence this top-up check.
+    //
+    // It must MEASURE rather than read inViewport: that ref is only ever written from
+    // the IntersectionObserver callback, which the browser has not run at this point,
+    // so it still reports the state from before the list grew. Reading it here is what
+    // fired the next page the instant the previous one landed.
+    await nextTick();
+    if (sentinelInViewport()) requestMore();
+  },
+);
 </script>
 
 <style>
