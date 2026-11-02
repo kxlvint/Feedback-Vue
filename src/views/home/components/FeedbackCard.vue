@@ -4,7 +4,8 @@ import { useRequest } from 'vue-hooks-plus';
 import { setUpvote, type Feedback } from '../../../lib/feedback';
 import { CATEGORY_STYLES, type Category } from '../../../lib/constants';
 import { formatExact, fromNow } from '../../../lib/date';
-import { avatarFor, FALLBACK_NAME } from '../../../lib/identity';
+import { avatarFor } from '../../../lib/identity';
+import IconArrowUp from '~icons/heroicons/arrow-up-16-solid';
 import { useVotesStore } from '../../../stores/votes';
 
 const props = defineProps<{ item: Feedback }>();
@@ -28,12 +29,12 @@ const voted = computed(() => votes.hasVoted(props.item.id));
 
 // Rows predating the display_name column have none, so fall back rather than
 // inventing a name for them.
-const authorName = computed(() => props.item.display_name ?? FALLBACK_NAME);
+const authorName = computed(() => props.item.display_name);
 
 // Keyed on the name, so the same author renders the same character every time.
 const avatar = computed(() => avatarFor(props.item.display_name));
 
-const { loading, run } = useRequest(setUpvote, {
+const { loading: loading_setUpvote, run: run_setUpvote } = useRequest(setUpvote, {
   manual: true,
 
   // The server count is authoritative and may differ from our guess if someone
@@ -57,7 +58,7 @@ function toggleVote() {
   votes.setVoted(props.item.id, next);
   upvotes.value = next ? upvotes.value + 1 : Math.max(upvotes.value - 1, 0);
 
-  run(props.item.id, next);
+  run_setUpvote(props.item.id, next);
 }
 </script>
 
@@ -104,23 +105,12 @@ function toggleVote() {
             ? 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
             : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
         "
-        :disabled="loading"
+        :disabled="loading_setUpvote"
         :aria-pressed="voted"
         :aria-label="voted ? 'Remove your upvote' : 'Upvote this feedback'"
         @click="toggleVote"
       >
-        <svg
-          class="size-3.5"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.75"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M8 13V3.5M8 3.5 3.5 8M8 3.5 12.5 8" />
-        </svg>
+        <IconArrowUp class="size-3.5" aria-hidden="true" />
         <span class="tabular-nums">{{ upvotes }}</span>
       </button>
     </div>

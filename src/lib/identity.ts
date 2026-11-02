@@ -43,6 +43,3 @@ export function avatarFor(name: string | null): string {
   avatarCache.set(seed, uri);
   return uri;
 }
-
-/** Shown for rows created before display_name existed. */
-export const FALLBACK_NAME = 'Anonymous';
