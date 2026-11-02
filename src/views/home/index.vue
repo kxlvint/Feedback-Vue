@@ -118,9 +118,9 @@ function scrollToTop() {
 <template>
   <main class="mx-auto max-w-2xl px-4 py-10">
     <header ref="headerRef" class="mb-8">
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team Feedback Loop</h1>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Say it anonymously</h1>
       <p class="mt-1 text-sm text-slate-500">
-        Anonymous feedback from the team. No names are collected.
+        Honest notes from the team. No account, no name, nothing that ties a post back to you.
       </p>
     </header>
 
@@ -129,7 +129,7 @@ function scrollToTop() {
     <SubmitForm @submitted="addNewRow" />
 
     <div class="mb-6 flex items-center gap-3">
-      <span class="text-sm font-medium text-slate-700">Filter</span>
+      <span class="text-sm font-medium text-slate-700">Show</span>
       <div role="group" aria-label="Filter by category" class="flex flex-wrap gap-2">
         <!-- "All" is a reset, not a fifth category: picking all four by hand returns
              the same rows from a different state, so it clears instead. -->
@@ -181,7 +181,7 @@ function scrollToTop() {
       v-if="error_fetchFeedback"
       class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
     >
-      <p class="font-medium">Oops.. Something went wrong.</p>
+      <p class="font-medium">The wall didn't load.</p>
       <p class="mt-1 text-red-700">{{ error_fetchFeedback.message }}</p>
       <button
         type="button"
@@ -199,7 +199,7 @@ function scrollToTop() {
         @click="showPending()"
       >
         <IconArrowUp class="size-3.5" aria-hidden="true" />
-        Show {{ pendingRows.length }} new
+        Show {{ pendingRows.length }} new {{ pendingRows.length === 1 ? 'post' : 'posts' }}
       </button>
     </div>
     <div v-show="dataList.length > 0" ref="listRef" class="scroll-mt-4">
@@ -207,7 +207,7 @@ function scrollToTop() {
         :items="dataList"
         :loading="loading_fetchFeedback"
         :is-end="isEnd"
-        end-text="That's everything."
+        end-text="You're all caught up."
         @load-more="loadMore"
       >
         <template #default="{ item }">
@@ -222,9 +222,8 @@ function scrollToTop() {
       v-if="!loading_fetchFeedback && !dataList.length && !error_fetchFeedback"
       class="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500"
     >
-      No feedback yet{{
-        searchParams.categories.length ? ` in ${searchParams.categories.join(', ')}` : ''
-      }}.
+      Nothing{{ searchParams.categories.length ? ` in ${searchParams.categories.join(', ')}` : '' }}
+      yet. Be the first to say something.
     </p>
 
     <button

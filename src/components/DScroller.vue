@@ -47,7 +47,7 @@ const props = withDefaults(
     minItemSize: DEFAULT_MIN_ITEM_SIZE,
     loading: false,
     isEnd: false,
-    endText: 'No more data',
+    endText: 'Nothing more to load',
   },
 );
 

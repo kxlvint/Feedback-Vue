@@ -39,7 +39,7 @@ function onSubmit() {
     @submit.prevent="onSubmit"
   >
     <label for="content" class="block text-sm font-medium text-slate-700">
-      Share anonymous feedback
+      What should the team hear?
     </label>
 
     <textarea
@@ -47,7 +47,7 @@ function onSubmit() {
       v-model="content"
       :maxlength="MAX_CONTENT_LENGTH"
       rows="8"
-      placeholder="What's working, what isn't?"
+      placeholder="Something that's working, something that isn't. Specifics help."
       class="mt-2 w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
     />
 
@@ -62,9 +62,9 @@ function onSubmit() {
       </span>
     </div>
 
-    <div class="mt-3 flex items-center gap-3">
+    <div class="mt-3 flex flex-wrap items-center gap-3">
       <label for="submit-category" class="text-sm font-medium text-slate-700"> Category </label>
-      <CategoryCombobox id="submit-category" v-model="category" placeholder="Choose one…" />
+      <CategoryCombobox id="submit-category" v-model="category" placeholder="Pick a topic" />
 
       <button
         type="submit"
@@ -76,16 +76,17 @@ function onSubmit() {
           class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
           aria-hidden="true"
         />
-        {{ loading_submitFeedback ? 'Sending…' : 'Submit' }}
+        {{ loading_submitFeedback ? 'Posting…' : 'Post anonymously' }}
       </button>
     </div>
 
     <p v-if="error_submitFeedback" class="mt-3 text-sm text-red-700">
-      Couldn't submit: {{ error_submitFeedback.message }}
+      Nothing was posted — {{ error_submitFeedback.message }}
     </p>
 
     <p class="mt-3 text-xs text-slate-400">
-      No name, email, or account is recorded with your feedback.
+      Nothing identifying is stored. The name shown on a post is generated for that post alone, so
+      two of yours never match.
     </p>
   </form>
 </template>
