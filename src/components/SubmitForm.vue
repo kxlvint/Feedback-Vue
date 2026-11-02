@@ -1,40 +1,35 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRequest } from 'vue-hooks-plus';
-import { submitFeedback } from '../lib/feedback';
+import { submitFeedback, type Feedback } from '../lib/feedback';
 import { MAX_CONTENT_LENGTH, type Category } from '../lib/constants';
 import CategoryCombobox from './CategoryCombobox.vue';
 
-const emit = defineEmits<{ submitted: [] }>();
+const emit = defineEmits<{ submitted: [row: Feedback] }>();
 
 const content = ref('');
 const category = ref<Category | null>(null);
 
 const remaining = computed(() => MAX_CONTENT_LENGTH - content.value.length);
-
-// The database constraint is on the TRIMMED length, and submitFeedback trims before
-// inserting — so whitespace-only input would fail in Postgres rather than here.
-// Checking trim() client-side keeps that error out of the UI entirely.
-//
-// The category is part of this now: it starts null, and `category` is NOT NULL in
-// Postgres, so an unchosen category has to be caught here rather than in the insert.
 const canSubmit = computed(() => content.value.trim().length > 0 && category.value !== null);
 
-const { loading, error, run } = useRequest(submitFeedback, {
+const {
+  run: run_submitFeedback,
+  loading: loading_submitFeedback,
+  error: error_submitFeedback,
+} = useRequest(submitFeedback, {
   manual: true,
-  onSuccess: () => {
+  onSuccess: (row) => {
     content.value = '';
     category.value = null;
-    emit('submitted');
+    emit('submitted', row);
   },
 });
 
 function onSubmit() {
-  // Read the ref into a local first: canSubmit already rules out a null category, but
-  // TypeScript cannot narrow through a computed, and submitFeedback takes a Category.
   const chosen = category.value;
-  if (!chosen || !canSubmit.value || loading.value) return;
-  run({ content: content.value, category: chosen });
+  if (!chosen || !canSubmit.value || loading_submitFeedback.value) return;
+  run_submitFeedback({ content: content.value, category: chosen });
 }
 </script>
 
@@ -74,18 +69,20 @@ function onSubmit() {
       <button
         type="submit"
         class="ml-auto inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="!canSubmit || loading"
+        :disabled="!canSubmit || loading_submitFeedback"
       >
         <span
-          v-if="loading"
+          v-if="loading_submitFeedback"
           class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
           aria-hidden="true"
         />
-        {{ loading ? 'Sending…' : 'Submit' }}
+        {{ loading_submitFeedback ? 'Sending…' : 'Submit' }}
       </button>
     </div>
 
-    <p v-if="error" class="mt-3 text-sm text-red-700">Couldn't submit: {{ error.message }}</p>
+    <p v-if="error_submitFeedback" class="mt-3 text-sm text-red-700">
+      Couldn't submit: {{ error_submitFeedback.message }}
+    </p>
 
     <p class="mt-3 text-xs text-slate-400">
       No name, email, or account is recorded with your feedback.

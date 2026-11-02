@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { nextTick, onUnmounted, reactive, ref } from 'vue';
 import { useRequest } from 'vue-hooks-plus';
 import { fetchFeedback, type Feedback } from '../../lib/feedback';
 import { CATEGORIES, type Category, CATEGORY_STYLES } from '../../lib/constants';
 import DScroller from '../../components/DScroller.vue';
 import SubmitForm from '../../components/SubmitForm.vue';
 import FeedbackCard from './components/FeedbackCard.vue';
+import { supabase } from '../../lib/supabase';
 
 const searchParams = reactive({
   pageIndex: 1,
@@ -14,6 +15,8 @@ const searchParams = reactive({
 });
 
 const dataList = ref<Feedback[]>([]);
+const pendingRows = ref<Feedback[]>([]);
+const listRef = ref<HTMLElement | null>(null);
 const total = ref(0);
 const isEnd = ref(false);
 
@@ -22,12 +25,27 @@ const { loading: loading_fetchFeedback, error: error_fetchFeedback } = useReques
   {
     refreshDeps: [searchParams],
     onSuccess: (data) => {
-      dataList.value = dataList.value.concat(data.rows);
-      isEnd.value = dataList.value.length >= data.total;
+      const loaded = new Set(dataList.value.map((r) => r.id));
+      const fresh = data.rows.filter((r) => !loaded.has(r.id));
+      dataList.value = dataList.value.concat(fresh);
+      fresh.forEach((r) => loaded.add(r.id));
+      if (pendingRows.value.length) {
+        pendingRows.value = pendingRows.value.filter((r) => !loaded.has(r.id));
+      }
+      isEnd.value =
+        searchParams.pageIndex * searchParams.pageSize >= data.total ||
+        data.rows.length < searchParams.pageSize;
       total.value = data.total;
     },
   },
 );
+
+function addNewRow(row: Feedback) {
+  pendingRows.value = pendingRows.value.filter((r) => r.id !== row.id);
+  if (dataList.value.some((r) => r.id === row.id)) return;
+  dataList.value = [row, ...dataList.value];
+  total.value += 1;
+}
 
 function loadMore() {
   if (!dataList.value.length) return;
@@ -39,6 +57,7 @@ function resetSearch() {
   dataList.value = [];
   total.value = 0;
   isEnd.value = false;
+  pendingRows.value = [];
   searchParams.pageIndex = 1;
 }
 
@@ -56,6 +75,36 @@ function clearCategories() {
   searchParams.categories = [];
   resetSearch();
 }
+
+function onInsert(row: Feedback) {
+  if (searchParams.categories.length && !searchParams.categories.includes(row.category as Category))
+    return;
+  if (dataList.value.some((r) => r.id === row.id)) return;
+  if (pendingRows.value.some((r) => r.id === row.id)) return;
+  pendingRows.value.push(row);
+}
+const channel = supabase
+  .channel('feedback-wall')
+  .on<Feedback>(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'feedback' },
+    (payload) => onInsert(payload.new),
+  )
+  .subscribe();
+
+onUnmounted(() => supabase.removeChannel(channel));
+
+async function showPending() {
+  dataList.value = [...pendingRows.value, ...dataList.value];
+  total.value += pendingRows.value.length;
+  pendingRows.value = [];
+
+  await nextTick();
+  listRef.value?.scrollIntoView({
+    block: 'start',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
+}
 </script>
 <template>
   <main class="mx-auto max-w-2xl px-4 py-10">
@@ -68,7 +117,7 @@ function clearCategories() {
 
     <!-- A new row goes to the top of the wall, so refetch rather than splicing it
          into the local list: the server ordering stays the single source of truth. -->
-    <SubmitForm @submitted="resetSearch()" />
+    <SubmitForm @submitted="addNewRow" />
 
     <div class="mb-6 flex items-center gap-3">
       <span class="text-sm font-medium text-slate-700">Filter</span>
@@ -133,7 +182,24 @@ function clearCategories() {
         Try again
       </button>
     </div>
-    <div v-show="dataList.length > 0">
+    <div class="sticky top-4 z-20 flex h-0 items-start justify-center" aria-live="polite">
+      <button
+        v-if="pendingRows.length"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white shadow-lg ring-1 ring-slate-900/5 transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        @click="showPending()"
+      >
+        <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path
+            fill-rule="evenodd"
+            d="M10 17a.75.75 0 0 1-.75-.75V5.61L5.3 9.7a.75.75 0 0 1-1.1-1.02l5.25-5.5a.75.75 0 0 1 1.1 0l5.25 5.5a.75.75 0 1 1-1.1 1.02L10.75 5.61V16.25A.75.75 0 0 1 10 17Z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        Show {{ pendingRows.length }} new
+      </button>
+    </div>
+    <div v-show="dataList.length > 0" ref="listRef" class="scroll-mt-4">
       <DScroller
         :items="dataList"
         :loading="loading_fetchFeedback"
