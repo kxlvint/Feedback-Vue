@@ -35,6 +35,20 @@ create policy "public can submit feedback"
   to anon
   with check (true);
 
+-- RLS authorises the INSERT but constrains no columns, and PostgREST will accept any
+-- column the role is allowed to write. Verified against a live project: a direct POST
+-- setting created_at, upvotes and display_name returned 201 with all three persisted.
+--
+-- created_at is the damaging one. The wall is ordered created_at desc and there is no
+-- delete policy, so a post dated in the far future pins itself to the top of the feed
+-- permanently and cannot be removed from the browser.
+--
+-- Column privileges are the gate that actually applies here: `with check` can test the
+-- values of a row, but not which columns the caller supplied. The SECURITY DEFINER
+-- functions below are unaffected -- they run as the owner, not as anon.
+revoke insert on feedback from anon;
+grant insert (content, category, display_name) on feedback to anon;
+
 -- Deliberately NO update or delete policy. Without one, RLS denies both,
 -- so submitted feedback is immutable from the browser.
 
